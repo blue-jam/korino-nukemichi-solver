@@ -396,22 +396,60 @@
 
         // Example puzzles
         const examples = {
-            1: `####
-#S_#
-#_G#
-####`,
-            2: `######
-#S___#
-#.#.##
-#___G#
-######`,
-            3: `########
-#S_____#
-#.#.#.##
-#______#
-##.#.#.#
-#_____G#
-########`
+            1: `
+##################
+#_____________####
+#______________###
+#_______________##
+#___#___________.#
+#_______________G#
+#_____#_________.#
+#__________#____##
+#____#__________##
+#_______________##
+#______________###
+#_________#_____##
+#__#____________##
+#_____#_________##
+#_______________##
+###############S##
+##################`.trim(),
+            2: `
+#############
+##_#_______##
+##_________G#
+##_________##
+#S_______#_.#
+#.#___#____##
+#############`.trim(),
+            3: `
+###########
+#####S.####
+#__#______#
+#_____#___#
+#_________#
+#________##
+#___#_____#
+#______#__#
+#_#_______#
+#_________#
+#####_____#
+######.#G##
+###########`.trim(),
+            4: `
+###########
+#####G.####
+#__#______#
+#_____#___#
+#_________#
+#________##
+#___#_____#
+#______#__#
+#_#_______#
+#_________#
+#####_____#
+######.#S##
+###########`.trim(),
         };
 
         function loadExample(num) {
@@ -422,13 +460,14 @@
         function loadExamplePuzzles() {
             const container = document.getElementById('examplePuzzles');
             const exampleTitles = {
-                1: '例1: 簡単',
-                2: '例2: 中級',
-                3: '例3: 上級'
+                1: '例1',
+                2: '例2',
+                3: '例3',
+                4: '例4',
             };
             
             let html = '';
-            for (let i = 1; i <= 3; i++) {
+            for (let i = 1; i <= 4; i++) {
                 html += `<div class="example-puzzle" onclick="loadExample(${i})">
                     <h3>${exampleTitles[i]}</h3>
                     <pre>${examples[i]}</pre>
@@ -551,38 +590,56 @@
             }
         }
 
+        // 幅優先探索で迷路を解き、答えを{ path, directions }として返す。
+        // ただし、pathは途中で通るマス（{row, col}）のリスト、
+        // directionsは方向(`up`, `down`, `left`, `right`)のリスト
+        // 解けない場合はnullを返す。
         function bfsSolve(grid, start, goal) {
-            const queue = [{ pos: start, path: [start], directions: [] }];
-            const visited = new Set();
-            visited.add(`${start.row},${start.col}`);
-
-            const directions = ['up', 'down', 'left', 'right'];
+            const queue = [start];
+            const previous = new Map();
+            previous.set(`(${start.row},${start.col})`, { position: null, direction: null });
+            
+            const directions = ['up', 'left', 'down', 'right'];
 
             while (queue.length > 0) {
-                const { pos, path, directions: dirPath } = queue.shift();
-
-                if (pos.row === goal.row && pos.col === goal.col) {
-                    return { path, directions: dirPath };
+                const current = queue.shift();
+                if (current.row === goal.row && current.col === goal.col) {
+                    break;
                 }
-
-                for (const dir of directions) {
-                    const newPos = move(grid, pos, dir);
-                    
-                    if (newPos) {
-                        const key = `${newPos.row},${newPos.col}`;
-                        if (!visited.has(key)) {
-                            visited.add(key);
-                            queue.push({
-                                pos: newPos,
-                                path: [...path, newPos],
-                                directions: [...dirPath, dir]
-                            });
-                        }
+                for (const d of directions) {
+                    const nextPos = move(grid, current, d);
+                    if (!nextPos) {
+                        continue;
                     }
+                    const s = `(${nextPos.row},${nextPos.col})`;
+                    if (previous.has(s)) {
+                        continue;
+                    }
+                    previous.set(s, { position: current, direction: d });
+                    queue.push(nextPos);
                 }
             }
 
-            return null;
+            let s = `(${goal.row},${goal.col})`;
+            if (!previous.has(s)) {
+                return null;
+            }
+
+            const path = [goal];
+            const dirs = [];
+            for (;;) {
+                const { position, direction } = previous.get(s);
+                if (!position) {
+                    break;
+                }
+                path.push(position);
+                dirs.push(direction);
+                s = `(${position.row},${position.col})`;
+            }
+            path.reverse();
+            dirs.reverse();
+
+            return { path, directions: dirs };
         }
 
         function showResult(message, type) {
