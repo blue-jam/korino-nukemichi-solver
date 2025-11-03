@@ -482,8 +482,7 @@
 
             if (!isValidMove(grid, nextPos)) return null;
 
-            // Check if the current or next cell is ice
-            const currentCell = grid[pos.row][pos.col];
+            // Check if the next cell is ice
             const nextCell = grid[nextPos.row][nextPos.col];
 
             // Move to the next position
@@ -502,9 +501,8 @@
                     newPos = slidePos;
                     const slideCell = grid[slidePos.row][slidePos.col];
                     
-                    // Stop if we hit a non-ice cell
-                    if (slideCell !== '_' && slideCell !== 'G') break;
-                    if (slideCell === 'G') break;
+                    // Stop if we hit a non-ice cell (including goal)
+                    if (slideCell !== '_') break;
                 }
             }
 
@@ -684,7 +682,7 @@
 
                     if (isPlayer) {
                         cellClass += ' player';
-                        cellContent = '😊';
+                        cellContent = 'P';
                     } else if (isGoal) {
                         cellClass += ' goal';
                         cellContent = 'G';
