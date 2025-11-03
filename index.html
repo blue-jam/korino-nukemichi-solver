@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>滑る床パズルソルバー (Sliding Floor Puzzle Solver)</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+
+        .section {
+            margin-bottom: 40px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.5em;
+        }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .legend-symbol {
+            font-family: monospace;
+            font-size: 1.2em;
+            font-weight: bold;
+            padding: 5px 10px;
+            background: white;
+            border-radius: 5px;
+            border: 2px solid #ddd;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            font-family: 'Courier New', monospace;
+            font-size: 16px;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+
+        #result.success {
+            background: #d4edda;
+            border: 2px solid #c3e6cb;
+            color: #155724;
+        }
+
+        #result.error {
+            background: #f8d7da;
+            border: 2px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .grid-container {
+            display: inline-block;
+            border: 3px solid #333;
+            background: #fff;
+            margin: 20px 0;
+        }
+
+        .grid-row {
+            display: flex;
+        }
+
+        .grid-cell {
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 18px;
+            border: 1px solid #ccc;
+            transition: all 0.3s ease;
+        }
+
+        .grid-cell.wall {
+            background: #333;
+            color: white;
+        }
+
+        .grid-cell.floor {
+            background: #e9ecef;
+        }
+
+        .grid-cell.ice {
+            background: #b8e0f6;
+            color: #0066cc;
+        }
+
+        .grid-cell.start {
+            background: #28a745;
+            color: white;
+        }
+
+        .grid-cell.goal {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .grid-cell.player {
+            background: #007bff;
+            color: white;
+            animation: pulse 1s infinite;
+        }
+
+        .grid-cell.path {
+            background: #ffeb3b;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .arrow-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 60px);
+            grid-template-rows: repeat(3, 60px);
+            gap: 5px;
+        }
+
+        .arrow-btn {
+            width: 60px;
+            height: 60px;
+            font-size: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .arrow-btn:hover:not(:disabled) {
+            background: #5568d3;
+            transform: scale(1.05);
+        }
+
+        .arrow-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .arrow-btn.up { grid-column: 2; grid-row: 1; }
+        .arrow-btn.left { grid-column: 1; grid-row: 2; }
+        .arrow-btn.right { grid-column: 3; grid-row: 2; }
+        .arrow-btn.down { grid-column: 2; grid-row: 3; }
+
+        .game-status {
+            margin-top: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+
+        .game-status.won {
+            color: #28a745;
+        }
+
+        .example-puzzles {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        .example-puzzle {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .example-puzzle:hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+        }
+
+        .example-puzzle h3 {
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: #667eea;
+        }
+
+        .example-puzzle pre {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            line-height: 1.2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧊 滑る床パズルソルバー</h1>
+        <p class="subtitle">Sliding Floor Puzzle Solver</p>
+
+        <div class="section">
+            <h2>📝 パズル入力 (Puzzle Input)</h2>
+            
+            <div class="legend">
+                <div class="legend-item">
+                    <span class="legend-symbol">#</span>
+                    <span>壁・岩 (Wall/Rock)</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-symbol">_</span>
+                    <span>滑る床 (Ice/Sliding Floor)</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-symbol">.</span>
+                    <span>普通の床 (Normal Floor)</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-symbol">S</span>
+                    <span>スタート (Start)</span>
+                </div>
+                <div class="legend-item">
+                    <span class="legend-symbol">G</span>
+                    <span>ゴール (Goal)</span>
+                </div>
+            </div>
+
+            <div class="example-puzzles">
+                <div class="example-puzzle" onclick="loadExample(1)">
+                    <h3>例1: 簡単</h3>
+                    <pre>####
+#S_#
+#_G#
+####</pre>
+                </div>
+                <div class="example-puzzle" onclick="loadExample(2)">
+                    <h3>例2: 中級</h3>
+                    <pre>######
+#S___#
+#.#.##
+#___G#
+######</pre>
+                </div>
+                <div class="example-puzzle" onclick="loadExample(3)">
+                    <h3>例3: 上級</h3>
+                    <pre>########
+#S_____#
+#.#.#.##
+#______#
+##.#.#.#
+#_____G#
+########</pre>
+                </div>
+            </div>
+
+            <textarea id="puzzleInput" placeholder="パズルのグリッドをここに入力してください...">#####
+#S__#
+#.#.#
+#__G#
+#####</textarea>
+
+            <div class="button-group">
+                <button class="btn-primary" onclick="solvePuzzle()">🔍 解く (Solve)</button>
+                <button class="btn-secondary" onclick="clearInput()">🗑️ クリア (Clear)</button>
+            </div>
+
+            <div id="result"></div>
+            <div id="solutionVisualization"></div>
+        </div>
+
+        <div class="section">
+            <h2>🎮 手動プレイ (Manual Play)</h2>
+            <p style="margin-bottom: 15px;">矢印ボタンまたはキーボードの矢印キーで移動できます。</p>
+            
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <div id="manualGrid"></div>
+                <div class="controls">
+                    <div class="arrow-buttons">
+                        <button class="arrow-btn up" onclick="movePlayer('up')">↑</button>
+                        <button class="arrow-btn left" onclick="movePlayer('left')">←</button>
+                        <button class="arrow-btn right" onclick="movePlayer('right')">→</button>
+                        <button class="arrow-btn down" onclick="movePlayer('down')">↓</button>
+                    </div>
+                    <button class="btn-success" onclick="resetManualGame()">🔄 リセット (Reset)</button>
+                    <div class="game-status" id="gameStatus"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Puzzle state
+        let grid = [];
+        let startPos = null;
+        let goalPos = null;
+
+        // Manual play state
+        let manualGrid = [];
+        let playerPos = null;
+        let manualStartPos = null;
+        let manualGoalPos = null;
+        let gameWon = false;
+
+        // Example puzzles
+        const examples = {
+            1: `####
+#S_#
+#_G#
+####`,
+            2: `######
+#S___#
+#.#.##
+#___G#
+######`,
+            3: `########
+#S_____#
+#.#.#.##
+#______#
+##.#.#.#
+#_____G#
+########`
+        };
+
+        function loadExample(num) {
+            document.getElementById('puzzleInput').value = examples[num];
+        }
+
+        function parseGrid(input) {
+            const lines = input.trim().split('\n');
+            const parsedGrid = [];
+            let start = null;
+            let goal = null;
+
+            for (let row = 0; row < lines.length; row++) {
+                const gridRow = [];
+                for (let col = 0; col < lines[row].length; col++) {
+                    const char = lines[row][col];
+                    gridRow.push(char);
+                    if (char === 'S') start = { row, col };
+                    if (char === 'G') goal = { row, col };
+                }
+                parsedGrid.push(gridRow);
+            }
+
+            return { grid: parsedGrid, start, goal };
+        }
+
+        function isValidMove(grid, pos) {
+            if (pos.row < 0 || pos.row >= grid.length) return false;
+            if (pos.col < 0 || pos.col >= grid[0].length) return false;
+            return grid[pos.row][pos.col] !== '#';
+        }
+
+        function move(grid, pos, direction) {
+            const directions = {
+                'up': { row: -1, col: 0 },
+                'down': { row: 1, col: 0 },
+                'left': { row: 0, col: -1 },
+                'right': { row: 0, col: 1 }
+            };
+
+            const delta = directions[direction];
+            let newPos = { row: pos.row, col: pos.col };
+            let nextPos = { row: pos.row + delta.row, col: pos.col + delta.col };
+
+            if (!isValidMove(grid, nextPos)) return null;
+
+            // Check if the current or next cell is ice
+            const currentCell = grid[pos.row][pos.col];
+            const nextCell = grid[nextPos.row][nextPos.col];
+
+            // Move to the next position
+            newPos = { ...nextPos };
+
+            // If on ice, keep sliding
+            if (nextCell === '_') {
+                while (true) {
+                    const slidePos = {
+                        row: newPos.row + delta.row,
+                        col: newPos.col + delta.col
+                    };
+                    
+                    if (!isValidMove(grid, slidePos)) break;
+                    
+                    newPos = slidePos;
+                    const slideCell = grid[slidePos.row][slidePos.col];
+                    
+                    // Stop if we hit a non-ice cell
+                    if (slideCell !== '_' && slideCell !== 'G') break;
+                    if (slideCell === 'G') break;
+                }
+            }
+
+            return newPos;
+        }
+
+        function solvePuzzle() {
+            const input = document.getElementById('puzzleInput').value;
+            const resultDiv = document.getElementById('result');
+            const visualizationDiv = document.getElementById('solutionVisualization');
+            
+            if (!input.trim()) {
+                showResult('パズルを入力してください。', 'error');
+                return;
+            }
+
+            try {
+                const { grid: parsedGrid, start, goal } = parseGrid(input);
+                
+                if (!start || !goal) {
+                    showResult('スタート(S)とゴール(G)を設定してください。', 'error');
+                    return;
+                }
+
+                grid = parsedGrid;
+                startPos = start;
+                goalPos = goal;
+
+                const solution = bfsSolve(parsedGrid, start, goal);
+
+                if (solution) {
+                    showResult(
+                        `✅ 解決しました！ ${solution.path.length - 1} 手で到達可能です。`,
+                        'success'
+                    );
+                    visualizeSolution(parsedGrid, solution.path);
+                    
+                    // Also set up manual play
+                    setupManualGame(parsedGrid, start, goal);
+                } else {
+                    showResult('❌ このパズルは解けません。', 'error');
+                    visualizationDiv.innerHTML = '';
+                }
+            } catch (error) {
+                showResult('エラー: ' + error.message, 'error');
+            }
+        }
+
+        function bfsSolve(grid, start, goal) {
+            const queue = [{ pos: start, path: [start] }];
+            const visited = new Set();
+            visited.add(`${start.row},${start.col}`);
+
+            const directions = ['up', 'down', 'left', 'right'];
+
+            while (queue.length > 0) {
+                const { pos, path } = queue.shift();
+
+                if (pos.row === goal.row && pos.col === goal.col) {
+                    return { path };
+                }
+
+                for (const dir of directions) {
+                    const newPos = move(grid, pos, dir);
+                    
+                    if (newPos) {
+                        const key = `${newPos.row},${newPos.col}`;
+                        if (!visited.has(key)) {
+                            visited.add(key);
+                            queue.push({
+                                pos: newPos,
+                                path: [...path, newPos]
+                            });
+                        }
+                    }
+                }
+            }
+
+            return null;
+        }
+
+        function showResult(message, type) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = type;
+            resultDiv.style.display = 'block';
+        }
+
+        function visualizeSolution(grid, path) {
+            const visualizationDiv = document.getElementById('solutionVisualization');
+            const pathSet = new Set(path.map(p => `${p.row},${p.col}`));
+            
+            let html = '<div class="grid-container">';
+            for (let row = 0; row < grid.length; row++) {
+                html += '<div class="grid-row">';
+                for (let col = 0; col < grid[row].length; col++) {
+                    const cell = grid[row][col];
+                    let cellClass = 'grid-cell';
+                    let cellContent = cell;
+
+                    if (cell === '#') cellClass += ' wall';
+                    else if (cell === '.') cellClass += ' floor';
+                    else if (cell === '_') cellClass += ' ice';
+                    else if (cell === 'S') cellClass += ' start';
+                    else if (cell === 'G') cellClass += ' goal';
+
+                    if (pathSet.has(`${row},${col}`) && cell !== 'S' && cell !== 'G') {
+                        cellClass += ' path';
+                    }
+
+                    html += `<div class="${cellClass}">${cellContent}</div>`;
+                }
+                html += '</div>';
+            }
+            html += '</div>';
+
+            visualizationDiv.innerHTML = html;
+        }
+
+        function clearInput() {
+            document.getElementById('puzzleInput').value = '';
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('solutionVisualization').innerHTML = '';
+        }
+
+        // Manual play functions
+        function setupManualGame(grid, start, goal) {
+            manualGrid = grid.map(row => [...row]);
+            manualStartPos = { ...start };
+            manualGoalPos = { ...goal };
+            playerPos = { ...start };
+            gameWon = false;
+            renderManualGrid();
+            updateGameStatus();
+        }
+
+        function resetManualGame() {
+            if (manualStartPos) {
+                playerPos = { ...manualStartPos };
+                gameWon = false;
+                renderManualGrid();
+                updateGameStatus();
+            } else {
+                // Try to set up from current input
+                const input = document.getElementById('puzzleInput').value;
+                if (input.trim()) {
+                    try {
+                        const { grid: parsedGrid, start, goal } = parseGrid(input);
+                        if (start && goal) {
+                            setupManualGame(parsedGrid, start, goal);
+                        }
+                    } catch (error) {
+                        alert('パズルを入力してください。');
+                    }
+                }
+            }
+        }
+
+        function renderManualGrid() {
+            const gridDiv = document.getElementById('manualGrid');
+            
+            if (!manualGrid.length) {
+                gridDiv.innerHTML = '<p>パズルを読み込んでください。</p>';
+                return;
+            }
+
+            let html = '<div class="grid-container">';
+            for (let row = 0; row < manualGrid.length; row++) {
+                html += '<div class="grid-row">';
+                for (let col = 0; col < manualGrid[row].length; col++) {
+                    const cell = manualGrid[row][col];
+                    let cellClass = 'grid-cell';
+                    let cellContent = cell;
+
+                    const isPlayer = playerPos && playerPos.row === row && playerPos.col === col;
+                    const isGoal = manualGoalPos && manualGoalPos.row === row && manualGoalPos.col === col;
+
+                    if (isPlayer) {
+                        cellClass += ' player';
+                        cellContent = '😊';
+                    } else if (isGoal) {
+                        cellClass += ' goal';
+                        cellContent = 'G';
+                    } else if (cell === '#') {
+                        cellClass += ' wall';
+                    } else if (cell === '.') {
+                        cellClass += ' floor';
+                    } else if (cell === '_') {
+                        cellClass += ' ice';
+                    } else if (cell === 'S') {
+                        cellClass += ' start';
+                    }
+
+                    html += `<div class="${cellClass}">${cellContent}</div>`;
+                }
+                html += '</div>';
+            }
+            html += '</div>';
+
+            gridDiv.innerHTML = html;
+        }
+
+        function movePlayer(direction) {
+            if (gameWon || !playerPos) return;
+
+            const newPos = move(manualGrid, playerPos, direction);
+            
+            if (newPos) {
+                playerPos = newPos;
+                renderManualGrid();
+                
+                if (playerPos.row === manualGoalPos.row && playerPos.col === manualGoalPos.col) {
+                    gameWon = true;
+                }
+                updateGameStatus();
+            }
+        }
+
+        function updateGameStatus() {
+            const statusDiv = document.getElementById('gameStatus');
+            if (gameWon) {
+                statusDiv.textContent = '🎉 ゴール！おめでとうございます！';
+                statusDiv.className = 'game-status won';
+            } else if (playerPos) {
+                statusDiv.textContent = '矢印キーで移動してください';
+                statusDiv.className = 'game-status';
+            } else {
+                statusDiv.textContent = '';
+                statusDiv.className = 'game-status';
+            }
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            const keyMap = {
+                'ArrowUp': 'up',
+                'ArrowDown': 'down',
+                'ArrowLeft': 'left',
+                'ArrowRight': 'right'
+            };
+
+            if (keyMap[e.key]) {
+                e.preventDefault();
+                movePlayer(keyMap[e.key]);
+            }
+        });
+
+        // Initialize with default puzzle for manual play
+        window.addEventListener('load', () => {
+            const input = document.getElementById('puzzleInput').value;
+            if (input) {
+                try {
+                    const { grid: parsedGrid, start, goal } = parseGrid(input);
+                    if (start && goal) {
+                        setupManualGame(parsedGrid, start, goal);
+                    }
+                } catch (error) {
+                    // Ignore errors on initial load
+                }
+            }
+        });
+    </script>
+</body>
+</html>
