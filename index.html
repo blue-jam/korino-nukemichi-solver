@@ -342,32 +342,8 @@
                 </div>
             </div>
 
-            <div class="example-puzzles">
-                <div class="example-puzzle" onclick="loadExample(1)">
-                    <h3>例1: 簡単</h3>
-                    <pre>####
-#S_#
-#_G#
-####</pre>
-                </div>
-                <div class="example-puzzle" onclick="loadExample(2)">
-                    <h3>例2: 中級</h3>
-                    <pre>######
-#S___#
-#.#.##
-#___G#
-######</pre>
-                </div>
-                <div class="example-puzzle" onclick="loadExample(3)">
-                    <h3>例3: 上級</h3>
-                    <pre>########
-#S_____#
-#.#.#.##
-#______#
-##.#.#.#
-#_____G#
-########</pre>
-                </div>
+            <div class="example-puzzles" id="examplePuzzles">
+                <!-- Examples will be loaded by JavaScript -->
             </div>
 
             <textarea id="puzzleInput" placeholder="パズルのグリッドをここに入力してください...">#####
@@ -440,6 +416,25 @@
 
         function loadExample(num) {
             document.getElementById('puzzleInput').value = examples[num];
+        }
+
+        // Load example puzzles into HTML
+        function loadExamplePuzzles() {
+            const container = document.getElementById('examplePuzzles');
+            const exampleTitles = {
+                1: '例1: 簡単',
+                2: '例2: 中級',
+                3: '例3: 上級'
+            };
+            
+            let html = '';
+            for (let i = 1; i <= 3; i++) {
+                html += `<div class="example-puzzle" onclick="loadExample(${i})">
+                    <h3>${exampleTitles[i]}</h3>
+                    <pre>${examples[i]}</pre>
+                </div>`;
+            }
+            container.innerHTML = html;
         }
 
         function parseGrid(input) {
@@ -534,11 +529,16 @@
                 const solution = bfsSolve(parsedGrid, start, goal);
 
                 if (solution) {
+                    const directionString = solution.directions.map(d => {
+                        const dirMap = { 'up': 'U', 'down': 'D', 'left': 'L', 'right': 'R' };
+                        return dirMap[d];
+                    }).join('');
+                    
                     showResult(
-                        `✅ 解決しました！ ${solution.path.length - 1} 手で到達可能です。`,
+                        `✅ 解決しました！ ${solution.path.length - 1} 手で到達可能です。\n経路: ${directionString}`,
                         'success'
                     );
-                    visualizeSolution(parsedGrid, solution.path);
+                    visualizeSolution(parsedGrid, solution.path, solution.directions);
                     
                     // Also set up manual play
                     setupManualGame(parsedGrid, start, goal);
@@ -552,17 +552,17 @@
         }
 
         function bfsSolve(grid, start, goal) {
-            const queue = [{ pos: start, path: [start] }];
+            const queue = [{ pos: start, path: [start], directions: [] }];
             const visited = new Set();
             visited.add(`${start.row},${start.col}`);
 
             const directions = ['up', 'down', 'left', 'right'];
 
             while (queue.length > 0) {
-                const { pos, path } = queue.shift();
+                const { pos, path, directions: dirPath } = queue.shift();
 
                 if (pos.row === goal.row && pos.col === goal.col) {
-                    return { path };
+                    return { path, directions: dirPath };
                 }
 
                 for (const dir of directions) {
@@ -574,7 +574,8 @@
                             visited.add(key);
                             queue.push({
                                 pos: newPos,
-                                path: [...path, newPos]
+                                path: [...path, newPos],
+                                directions: [...dirPath, dir]
                             });
                         }
                     }
@@ -591,7 +592,7 @@
             resultDiv.style.display = 'block';
         }
 
-        function visualizeSolution(grid, path) {
+        function visualizeSolution(grid, path, directions) {
             const visualizationDiv = document.getElementById('solutionVisualization');
             const pathSet = new Set(path.map(p => `${p.row},${p.col}`));
             
@@ -752,6 +753,9 @@
 
         // Initialize with default puzzle for manual play
         window.addEventListener('load', () => {
+            // Load example puzzles
+            loadExamplePuzzles();
+            
             const input = document.getElementById('puzzleInput').value;
             if (input) {
                 try {
