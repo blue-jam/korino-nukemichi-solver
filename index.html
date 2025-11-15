@@ -595,9 +595,11 @@
                     
                     // Calculate expected value
                     const expectedValue = calculateExpectedValue(parsedGrid, start, goal);
-                    let resultMessage = `✅ 解決しました！ ${solution.path.length - 1} 手で到達可能です。\n経路: ${directionString}`;
+                    let resultMessage = `✅ 解決しました！ ${solution.path.length - 1} 手で到達可能です。経路: ${directionString}.`;
                     if (expectedValue !== null) {
                         resultMessage += `\n\nランダム移動でゴールまでの期待ターン数: ${expectedValue.toFixed(2)}`;
+                    } else {
+                        resultMessage += `\n\nランダム移動でゴールまでの期待ターン数を計算できませんでした。`;
                     }
                     
                     showResult(resultMessage, 'success');
@@ -822,6 +824,7 @@
             const n = A.length;
             // Create augmented matrix
             const augmented = A.map((row, i) => [...row, b[i]]);
+            console.log('拡大係数行列', augmented);
             
             // Forward elimination with partial pivoting
             for (let col = 0; col < n; col++) {
@@ -849,12 +852,17 @@
                     }
                 }
             }
+            console.log('消去法後の拡大係数行列', augmented);
             
             // Back substitution
             const x = new Array(n).fill(0);
             for (let i = n - 1; i >= 0; i--) {
                 if (Math.abs(augmented[i][i]) < 1e-10) {
-                    x[i] = 0; // If pivot is too small, assume solution is 0
+                    if (Math.abs(augmented[i][n]) > 1e-10) {
+                        x[i] = NaN; // No solution
+                    } else {
+                        x[i] = 0; // If pivot is too small, assume solution is 0
+                    }
                     continue;
                 }
                 x[i] = augmented[i][n];
@@ -958,7 +966,7 @@
                 const solution = solveLinearSystem(A, b);
                 const startIdx = stateMap.get(`${start.row},${start.col}`);
                 
-                return solution[startIdx];
+                return isNaN(solution[startIdx]) ? null : solution[startIdx];
             } catch (error) {
                 console.error('Error calculating expected value:', error);
                 return null;
@@ -1008,8 +1016,8 @@
                     
                     while (Date.now() - startTime < simTimeSeconds * 1000) {
                         const result = simulateRandomWalk(parsedGrid, start, goal, maxTurns);
+                        totalTurns += result.turns;
                         if (result.success) {
-                            totalTurns += result.turns;
                             successCount++;
                         } else {
                             failCount++;
@@ -1017,7 +1025,7 @@
                     }
                     
                     if (successCount > 0) {
-                        const avgTurns = totalTurns / successCount;
+                        const avgTurns = totalTurns / (successCount + failCount);
                         resultDiv.innerHTML = `
                             <strong>✅ シミュレーション完了</strong><br>
                             成功回数: ${successCount}<br>
