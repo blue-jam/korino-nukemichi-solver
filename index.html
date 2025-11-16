@@ -831,6 +831,7 @@
             let rank = 0;
             const pivotCols = [];
             
+            console.log('Augmented Matrix before elimination:', JSON.parse(JSON.stringify(augmented)));
             for (let col = 0; col < n; col++) {
                 // Find pivot row for this column
                 let maxRow = rank;
@@ -859,6 +860,7 @@
                 
                 rank++;
             }
+            console.log('Augmented Matrix after elimination:', augmented);
             
             // Check for inconsistency (rank of A < rank of [A|b])
             // This happens when there's a row [0 0 ... 0 | c] where c != 0
