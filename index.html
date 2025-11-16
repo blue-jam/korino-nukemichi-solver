@@ -822,55 +822,81 @@
         // Solve system of linear equations using Gaussian elimination with partial pivoting
         function solveLinearSystem(A, b) {
             const n = A.length;
+            const EPS = 1e-10;
+            
             // Create augmented matrix
             const augmented = A.map((row, i) => [...row, b[i]]);
-            console.log('拡大係数行列', augmented);
             
             // Forward elimination with partial pivoting
+            let rank = 0;
+            const pivotCols = [];
+            
             for (let col = 0; col < n; col++) {
-                // Find pivot
-                let maxRow = col;
-                for (let row = col + 1; row < n; row++) {
+                // Find pivot row for this column
+                let maxRow = rank;
+                for (let row = rank + 1; row < n; row++) {
                     if (Math.abs(augmented[row][col]) > Math.abs(augmented[maxRow][col])) {
                         maxRow = row;
                     }
                 }
                 
-                // Swap rows
-                [augmented[col], augmented[maxRow]] = [augmented[maxRow], augmented[col]];
-                
-                // Check for singular matrix
-                if (Math.abs(augmented[col][col]) < 1e-10) {
-                    continue; // Skip if pivot is too small
+                // Check if pivot is too small (column is linearly dependent)
+                if (Math.abs(augmented[maxRow][col]) < EPS) {
+                    continue; // Skip this column
                 }
+                
+                // Swap rows
+                [augmented[rank], augmented[maxRow]] = [augmented[maxRow], augmented[rank]];
+                pivotCols.push(col);
                 
                 // Eliminate column
-                for (let row = col + 1; row < n; row++) {
-                    const factor = augmented[row][col] / augmented[col][col];
+                for (let row = rank + 1; row < n; row++) {
+                    const factor = augmented[row][col] / augmented[rank][col];
                     for (let j = col; j <= n; j++) {
-                        augmented[row][j] -= factor * augmented[col][j];
+                        augmented[row][j] -= factor * augmented[rank][j];
                     }
                 }
+                
+                rank++;
             }
-            console.log('消去法後の拡大係数行列', augmented);
+            
+            // Check for inconsistency (rank of A < rank of [A|b])
+            // This happens when there's a row [0 0 ... 0 | c] where c != 0
+            for (let i = rank; i < n; i++) {
+                let allZero = true;
+                for (let j = 0; j < n; j++) {
+                    if (Math.abs(augmented[i][j]) > EPS) {
+                        allZero = false;
+                        break;
+                    }
+                }
+                if (allZero && Math.abs(augmented[i][n]) > EPS) {
+                    // Inconsistent system - no solution
+                    console.error('連立方程式が解けません: 係数行列と拡大係数行列の階数が異なります');
+                    return null;
+                }
+            }
+            
+            // Check if system is underdetermined (rank < n)
+            if (rank < n) {
+                console.warn('連立方程式が一意に決まりません: 係数行列の階数が小さいです (rank=' + rank + ', n=' + n + ')');
+                // For underdetermined systems, we'll try to find a solution with free variables set to 0
+            }
             
             // Back substitution
             const x = new Array(n).fill(0);
-            for (let i = n - 1; i >= 0; i--) {
-                if (Math.abs(augmented[i][i]) < 1e-10) {
-                    if (Math.abs(augmented[i][n]) > 1e-10) {
-                        x[i] = NaN; // No solution
-                    } else {
-                        x[i] = 0; // If pivot is too small, assume solution is 0
-                    }
-                    continue;
+            
+            // Set values for pivot variables
+            for (let i = rank - 1; i >= 0; i--) {
+                const col = pivotCols[i];
+                x[col] = augmented[i][n];
+                for (let j = col + 1; j < n; j++) {
+                    x[col] -= augmented[i][j] * x[j];
                 }
-                x[i] = augmented[i][n];
-                for (let j = i + 1; j < n; j++) {
-                    x[i] -= augmented[i][j] * x[j];
-                }
-                x[i] /= augmented[i][i];
+                x[col] /= augmented[i][col];
             }
+            
+            // Free variables remain 0
             
             return x;
         }
@@ -964,9 +990,21 @@
                 
                 // Solve using Gaussian elimination
                 const solution = solveLinearSystem(A, b);
-                const startIdx = stateMap.get(`${start.row},${start.col}`);
                 
-                return isNaN(solution[startIdx]) ? null : solution[startIdx];
+                if (solution === null) {
+                    // System is inconsistent or cannot be solved
+                    return null;
+                }
+                
+                const startIdx = stateMap.get(`${start.row},${start.col}`);
+                const expectedValue = solution[startIdx];
+                
+                // Check if the solution is valid (not NaN or infinite)
+                if (isNaN(expectedValue) || !isFinite(expectedValue)) {
+                    return null;
+                }
+                
+                return expectedValue;
             } catch (error) {
                 console.error('Error calculating expected value:', error);
                 return null;
