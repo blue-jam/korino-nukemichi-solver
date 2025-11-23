@@ -379,6 +379,26 @@
                 </div>
             </div>
         </div>
+
+        <div class="section">
+            <h2>🎲 ランダム移動シミュレーション (Random Walk Simulation)</h2>
+            <p style="margin-bottom: 15px;">ランダムに移動した時に、ゴールするまでのターン数の平均を計算します。</p>
+            
+            <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 15px;">
+                <div>
+                    <label for="simTime" style="display: block; margin-bottom: 5px;">シミュレーション時間（秒）:</label>
+                    <input type="number" id="simTime" value="10" min="1" max="60" style="padding: 8px; border: 2px solid #ddd; border-radius: 5px; width: 120px;">
+                </div>
+                <div>
+                    <label for="maxTurns" style="display: block; margin-bottom: 5px;">最大ターン数:</label>
+                    <input type="number" id="maxTurns" value="10000" min="100" max="100000" style="padding: 8px; border: 2px solid #ddd; border-radius: 5px; width: 120px;">
+                </div>
+            </div>
+
+            <button class="btn-primary" onclick="runSimulation()">▶️ シミュレーション開始 (Start Simulation)</button>
+            
+            <div id="simulationResult" style="margin-top: 20px; padding: 15px; border-radius: 8px; display: none;"></div>
+        </div>
     </div>
 
     <script>
@@ -573,10 +593,16 @@
                         return dirMap[d];
                     }).join('');
                     
-                    showResult(
-                        `✅ 解決しました！ ${solution.path.length - 1} 手で到達可能です。\n経路: ${directionString}`,
-                        'success'
-                    );
+                    // Calculate expected value
+                    const expectedValue = calculateExpectedValue(parsedGrid, start, goal);
+                    let resultMessage = `✅ 解決しました！ ${solution.path.length - 1} 手で到達可能です。経路: ${directionString}.`;
+                    if (expectedValue !== null) {
+                        resultMessage += `\n\nランダム移動でゴールまでの期待ターン数: ${expectedValue.toFixed(2)}`;
+                    } else {
+                        resultMessage += `\n\nランダム移動でゴールまでの期待ターン数を計算できませんでした。`;
+                    }
+                    
+                    showResult(resultMessage, 'success');
                     visualizeSolution(parsedGrid, solution.path, solution.directions);
                     
                     // Also set up manual play
@@ -791,6 +817,314 @@
                 statusDiv.textContent = '';
                 statusDiv.className = 'game-status';
             }
+        }
+
+        // Solve system of linear equations using Gaussian elimination with partial pivoting
+        function solveLinearSystem(A, b) {
+            const n = A.length;
+            const EPS = 1e-10;
+            
+            // Create augmented matrix
+            const augmented = A.map((row, i) => [...row, b[i]]);
+            
+            // Forward elimination with partial pivoting
+            let rank = 0;
+            const pivotCols = [];
+            
+            console.log('Augmented Matrix before elimination:', JSON.parse(JSON.stringify(augmented)));
+            for (let col = 0; col < n; col++) {
+                // Find pivot row for this column
+                let maxRow = rank;
+                for (let row = rank + 1; row < n; row++) {
+                    if (Math.abs(augmented[row][col]) > Math.abs(augmented[maxRow][col])) {
+                        maxRow = row;
+                    }
+                }
+                
+                // Check if pivot is too small (column is linearly dependent)
+                if (Math.abs(augmented[maxRow][col]) < EPS) {
+                    continue; // Skip this column
+                }
+                
+                // Swap rows
+                [augmented[rank], augmented[maxRow]] = [augmented[maxRow], augmented[rank]];
+                pivotCols.push(col);
+                
+                // Eliminate column
+                for (let row = rank + 1; row < n; row++) {
+                    const factor = augmented[row][col] / augmented[rank][col];
+                    for (let j = col; j <= n; j++) {
+                        augmented[row][j] -= factor * augmented[rank][j];
+                    }
+                }
+                
+                rank++;
+            }
+            console.log('Augmented Matrix after elimination:', augmented);
+            
+            // Check for inconsistency (rank of A < rank of [A|b])
+            // This happens when there's a row [0 0 ... 0 | c] where c != 0
+            for (let i = rank; i < n; i++) {
+                let allZero = true;
+                for (let j = 0; j < n; j++) {
+                    if (Math.abs(augmented[i][j]) > EPS) {
+                        allZero = false;
+                        break;
+                    }
+                }
+                if (allZero && Math.abs(augmented[i][n]) > EPS) {
+                    // Inconsistent system - no solution
+                    console.error('連立方程式が解けません: 係数行列と拡大係数行列の階数が異なります');
+                    return null;
+                }
+            }
+            
+            // Check if system is underdetermined (rank < n)
+            if (rank < n) {
+                console.warn('連立方程式が一意に決まりません: 係数行列の階数が小さいです (rank=' + rank + ', n=' + n + ')');
+                // For underdetermined systems, we'll try to find a solution with free variables set to 0
+            }
+            
+            // Back substitution
+            const x = new Array(n).fill(0);
+            
+            // Set values for pivot variables
+            for (let i = rank - 1; i >= 0; i--) {
+                const col = pivotCols[i];
+                x[col] = augmented[i][n];
+                for (let j = col + 1; j < n; j++) {
+                    x[col] -= augmented[i][j] * x[j];
+                }
+                x[col] /= augmented[i][col];
+            }
+            
+            // Free variables remain 0
+            
+            return x;
+        }
+
+        // Calculate expected value using linear equations
+        function calculateExpectedValue(grid, start, goal) {
+            try {
+                // Build state space - all reachable positions
+                const states = [];
+                const stateMap = new Map();
+                const queue = [start];
+                const visited = new Set([`${start.row},${start.col}`]);
+                
+                while (queue.length > 0) {
+                    const pos = queue.shift();
+                    const key = `${pos.row},${pos.col}`;
+                    stateMap.set(key, states.length);
+                    states.push(pos);
+                    
+                    // Skip goal state (absorbing state)
+                    if (pos.row === goal.row && pos.col === goal.col) {
+                        continue;
+                    }
+                    
+                    // Find valid moves from this position
+                    const directions = ['up', 'down', 'left', 'right'];
+                    for (const dir of directions) {
+                        const nextPos = move(grid, pos, dir);
+                        if (nextPos) {
+                            const nextKey = `${nextPos.row},${nextPos.col}`;
+                            if (!visited.has(nextKey)) {
+                                visited.add(nextKey);
+                                queue.push(nextPos);
+                            }
+                        }
+                    }
+                }
+                
+                const n = states.length;
+                const goalIdx = stateMap.get(`${goal.row},${goal.col}`);
+                
+                if (goalIdx === undefined) {
+                    return null; // Goal not reachable
+                }
+                
+                // Build system of linear equations: E[i] = 1 + sum(P[i][j] * E[j])
+                // Rearrange to: E[i] - sum(P[i][j] * E[j]) = 1
+                // For goal state: E[goal] = 0
+                
+                // Build coefficient matrix A and constant vector b
+                const A = [];
+                const b = [];
+                
+                for (let i = 0; i < n; i++) {
+                    const pos = states[i];
+                    const row = Array(n).fill(0);
+                    
+                    if (i === goalIdx) {
+                        // Goal state: E[goal] = 0
+                        row[i] = 1;
+                        b.push(0);
+                    } else {
+                        // Non-goal state: E[i] - sum(P[i][j] * E[j]) = 1
+                        row[i] = 1;
+                        
+                        // Find all valid moves and their probabilities
+                        const directions = ['up', 'down', 'left', 'right'];
+                        const validMoves = [];
+                        
+                        for (const dir of directions) {
+                            const nextPos = move(grid, pos, dir);
+                            if (nextPos) {
+                                validMoves.push(nextPos);
+                            }
+                        }
+                        
+                        if (validMoves.length > 0) {
+                            const prob = 1.0 / validMoves.length;
+                            for (const nextPos of validMoves) {
+                                const nextKey = `${nextPos.row},${nextPos.col}`;
+                                const nextIdx = stateMap.get(nextKey);
+                                row[nextIdx] -= prob;
+                            }
+                        }
+                        
+                        b.push(1);
+                    }
+                    
+                    A.push(row);
+                }
+                
+                // Solve using Gaussian elimination
+                const solution = solveLinearSystem(A, b);
+                
+                if (solution === null) {
+                    // System is inconsistent or cannot be solved
+                    return null;
+                }
+                
+                const startIdx = stateMap.get(`${start.row},${start.col}`);
+                const expectedValue = solution[startIdx];
+                
+                // Check if the solution is valid (not NaN or infinite)
+                if (isNaN(expectedValue) || !isFinite(expectedValue)) {
+                    return null;
+                }
+                
+                return expectedValue;
+            } catch (error) {
+                console.error('Error calculating expected value:', error);
+                return null;
+            }
+        }
+        
+        // Run random walk simulation
+        function runSimulation() {
+            const input = document.getElementById('puzzleInput').value;
+            const simTimeSeconds = parseInt(document.getElementById('simTime').value);
+            const maxTurns = parseInt(document.getElementById('maxTurns').value);
+            const resultDiv = document.getElementById('simulationResult');
+            
+            if (!input.trim()) {
+                resultDiv.textContent = 'パズルを入力してください。';
+                resultDiv.style.background = '#f8d7da';
+                resultDiv.style.border = '2px solid #f5c6cb';
+                resultDiv.style.color = '#721c24';
+                resultDiv.style.display = 'block';
+                return;
+            }
+            
+            try {
+                const { grid: parsedGrid, start, goal } = parseGrid(input);
+                
+                if (!start || !goal) {
+                    resultDiv.textContent = 'スタート(S)とゴール(G)を設定してください。';
+                    resultDiv.style.background = '#f8d7da';
+                    resultDiv.style.border = '2px solid #f5c6cb';
+                    resultDiv.style.color = '#721c24';
+                    resultDiv.style.display = 'block';
+                    return;
+                }
+                
+                resultDiv.textContent = 'シミュレーション実行中...';
+                resultDiv.style.background = '#d1ecf1';
+                resultDiv.style.border = '2px solid #bee5eb';
+                resultDiv.style.color = '#0c5460';
+                resultDiv.style.display = 'block';
+                
+                // Run simulation asynchronously
+                setTimeout(() => {
+                    const startTime = Date.now();
+                    let totalTurns = 0;
+                    let successCount = 0;
+                    let failCount = 0;
+                    
+                    while (Date.now() - startTime < simTimeSeconds * 1000) {
+                        const result = simulateRandomWalk(parsedGrid, start, goal, maxTurns);
+                        totalTurns += result.turns;
+                        if (result.success) {
+                            successCount++;
+                        } else {
+                            failCount++;
+                        }
+                    }
+                    
+                    if (successCount > 0) {
+                        const avgTurns = totalTurns / (successCount + failCount);
+                        resultDiv.innerHTML = `
+                            <strong>✅ シミュレーション完了</strong><br>
+                            成功回数: ${successCount}<br>
+                            失敗回数: ${failCount}<br>
+                            平均ターン数: ${avgTurns.toFixed(2)}
+                        `;
+                        resultDiv.style.background = '#d4edda';
+                        resultDiv.style.border = '2px solid #c3e6cb';
+                        resultDiv.style.color = '#155724';
+                    } else {
+                        resultDiv.textContent = `❌ シミュレーション失敗: ${failCount} 回すべて最大ターン数 ${maxTurns} に到達しました。`;
+                        resultDiv.style.background = '#f8d7da';
+                        resultDiv.style.border = '2px solid #f5c6cb';
+                        resultDiv.style.color = '#721c24';
+                    }
+                }, 10);
+                
+            } catch (error) {
+                resultDiv.textContent = 'エラー: ' + error.message;
+                resultDiv.style.background = '#f8d7da';
+                resultDiv.style.border = '2px solid #f5c6cb';
+                resultDiv.style.color = '#721c24';
+                resultDiv.style.display = 'block';
+            }
+        }
+        
+        // Simulate one random walk
+        function simulateRandomWalk(grid, start, goal, maxTurns) {
+            let pos = { ...start };
+            let turns = 0;
+            
+            while (turns < maxTurns) {
+                if (pos.row === goal.row && pos.col === goal.col) {
+                    return { success: true, turns };
+                }
+                
+                // Find valid moves
+                const directions = ['up', 'down', 'left', 'right'];
+                const validMoves = [];
+                
+                for (const dir of directions) {
+                    const nextPos = move(grid, pos, dir);
+                    if (nextPos) {
+                        validMoves.push({ dir, pos: nextPos });
+                    }
+                }
+                
+                if (validMoves.length === 0) {
+                    // No valid moves - stuck
+                    return { success: false, turns };
+                }
+                
+                // Choose random move
+                const randomMove = validMoves[Math.floor(Math.random() * validMoves.length)];
+                pos = randomMove.pos;
+                turns++;
+            }
+            
+            return { success: false, turns: maxTurns };
         }
 
         // Keyboard controls
